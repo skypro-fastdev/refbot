@@ -3,6 +3,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 import asyncio
 import logging
+import os
 
 # Включаем логирование
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +27,7 @@ async def echo_message(message: Message):
 # Функция настройки и запуска бота
 async def main():
     # Создаем объект бота (токен получаем от @BotFather в Telegram)
-    bot = Bot(token="YOUR_BOT_TOKEN_HERE")
+    bot = Bot(token=os.getenv("TG_TOKEN"))
     
     # Создаем диспетчер
     dp = Dispatcher()
