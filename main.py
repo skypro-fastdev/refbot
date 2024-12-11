@@ -14,15 +14,17 @@ router = Router()
 # Обработчик команды /start
 @router.message(Command("start"))
 async def cmd_start(message: Message):
-    await message.answer(
-        "Привет! Я эхо-бот. Отправь мне любое сообщение, и я его повторю."
-    )
+    if message.chat.type == "private":
+        await message.answer(
+            "Привет! Я эхо-бот. Отправь мне любое сообщение, и я его повторю."
+        )
 
 # Обработчик всех остальных текстовых сообщений
 @router.message()
 async def echo_message(message: Message):
-    # Повторяем текст сообщения пользователя
-    await message.answer(message.text)
+    if message.chat.type == "private":
+        # Повторяем текст сообщения пользователя
+        await message.answer(message.text)
 
 # Функция настройки и запуска бота
 async def main():
