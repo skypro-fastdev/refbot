@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 
 from aiogram import Bot, Router, F
@@ -7,6 +8,8 @@ from aiogram.types import Message, CallbackQuery, ChatJoinRequest, ChatMemberUpd
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from utils import get_request, post_request
+
+logger = logging.getLogger(__name__)
 
 if os.getenv("SERVER") == "production":
     CHANNEL_ID = os.getenv("TG_CHANNEL_ID")
@@ -64,7 +67,7 @@ async def handle_invite_creation(user_id: int, bot: Bot):
         return f"🔗 Ваша новая ссылка:\n{invite.invite_link}"
 
     except Exception as e:
-        print(f'Error creating invite link for user {user_id}: {e}')
+        logger.error(f'Error creating invite link for user {user_id}: {e}')
         return "❌ Ошибка во время создании ссылки!\n"
 
 
@@ -112,7 +115,7 @@ async def process_join_request(join_request: ChatJoinRequest, bot: Bot):
                 f"✅ По вашей ссылке к нам пришёл(ла): @{join_request.from_user.username or 'человек без username'}"
             )
     except Exception as e:
-        print(f"Error saving join request: {e}")
+        logger.error(f"Error saving join request: {e}")
 
 
 @router.chat_member(ChatMemberUpdatedFilter(member_status_changed=MEMBER))
@@ -133,7 +136,7 @@ async def process_join(event: ChatMemberUpdated, bot: Bot):
             await post_request(GUESTS_URL, guest_data)
 
         except Exception as e:
-            print(f"Error processing channel join: {e}")
+            logger.error(f"Error processing channel join: {e}")
 
 
 @router.message(Command("stats"))
@@ -153,5 +156,5 @@ async def cmd_stats(message: Message):
         )
 
     except Exception as e:
-        print(f"Error getting stats for user {user_id}: {e}")
+        logger.error(f"Error getting stats for user {user_id}: {e}")
         await message.answer("❌ Ошибка при получении статистики")
