@@ -3,8 +3,8 @@ import logging
 import os
 
 from aiogram import Bot, Router, F
-from aiogram.filters import Command, ChatMemberUpdatedFilter, MEMBER
-from aiogram.types import Message, CallbackQuery, ChatJoinRequest, ChatMemberUpdated
+from aiogram.filters import Command
+from aiogram.types import Message, CallbackQuery, ChatJoinRequest
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from utils import get_request, post_request
@@ -88,55 +88,42 @@ async def callback_create_invite(callback_query: CallbackQuery, bot: Bot):
 
 @router.chat_join_request()
 async def process_join_request(join_request: ChatJoinRequest, bot: Bot):
-    if not join_request.invite_link or not join_request.invite_link.name:
+    if not join_request.invite_link:
         return
 
-    invite_name = join_request.invite_link.name
-    if invite_name.startswith('invite_'):
-        referrer_id = int(invite_name.split('_')[1])
-    else:
-        referrer_id = None
-
     try:
-        await post_request(GUESTS_URL, {
+        guest_data = {
             "t_id": join_request.from_user.id,
-            "ref_id": int(referrer_id) if referrer_id else "",
-            "ref_name": invite_name if invite_name else "",
-            "invite_link": join_request.invite_link.invite_link,
             "joined_at": datetime.datetime.now().isoformat(),
-        })
+            "invite_link": join_request.invite_link.invite_link
+        }
 
-        await join_request.approve()
+        invite_name = join_request.invite_link.name
+        if invite_name and invite_name.startswith('invite_'):
+            referrer_id = int(invite_name.split('_')[1])
 
-        if referrer_id:
+            guest_data.update({
+                "ref_id": referrer_id,
+                "ref_name": invite_name
+            })
+
             # Уведомляем пригласившего
             await bot.send_message(
                 referrer_id,
                 f"✅ По вашей ссылке к нам пришёл(ла): @{join_request.from_user.username or 'человек без username'}"
             )
+        else:
+            # Приглашение не было создано через бота
+            guest_data.update({
+                "ref_id": "",
+                "ref_name": invite_name if invite_name else "other invite"
+            })
+
+        await post_request(GUESTS_URL, guest_data)
+        await join_request.approve()
+
     except Exception as e:
         logger.error(f"Error saving join request: {e}")
-
-
-@router.chat_member(ChatMemberUpdatedFilter(member_status_changed=MEMBER))
-async def process_join(event: ChatMemberUpdated, bot: Bot):
-    # Проверяем, что это именно вступление в канал
-    if event.old_chat_member.status == 'left' and event.new_chat_member.status == 'member':
-        try:
-            # Получаем информацию о том, как пользователь вступил
-            invite_link = event.invite_link
-            guest_data = {
-                "t_id": event.new_chat_member.user.id,
-                "joined_at": datetime.datetime.now().isoformat(),
-            }
-
-            if invite_link:
-                guest_data.update({"invite_link": invite_link.invite_link})
-
-            await post_request(GUESTS_URL, guest_data)
-
-        except Exception as e:
-            logger.error(f"Error processing channel join: {e}")
 
 
 @router.message(Command("stats"))
