@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 import os
@@ -7,6 +8,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, ChatJoinRequest
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+from messages import GIFT_MESSAGE
 from utils import get_request, post_request
 
 logger = logging.getLogger(__name__)
@@ -86,6 +88,29 @@ async def callback_create_invite(callback_query: CallbackQuery, bot: Bot):
     await callback_query.answer()
 
 
+async def check_and_notify_first_referral(bot: Bot, referrer_id: str, username: str | None = None):
+    try:
+        guests_data = await get_request(GUESTS_URL)
+
+        ref_name = f'invite_{referrer_id}'
+        ref_guests = [guest for guest in guests_data if guest.get('ref_name') == ref_name]
+
+        if not ref_guests:
+            await bot.send_message(referrer_id, GIFT_MESSAGE)
+        else:
+            message = f"✅ По вашей ссылке к нам пришёл"
+            if username:
+                message += f"(ла): @{username}"
+            else:
+                message += " +1 человек"
+
+            await bot.send_message(referrer_id, message)
+
+
+    except Exception as e:
+        logger.error(f"Error in notification task for user {referrer_id}: {e}")
+
+
 @router.chat_join_request()
 async def process_join_request(join_request: ChatJoinRequest, bot: Bot):
     if not join_request.invite_link:
@@ -107,11 +132,11 @@ async def process_join_request(join_request: ChatJoinRequest, bot: Bot):
                 "ref_name": invite_name
             })
 
-            # Уведомляем пригласившего
-            await bot.send_message(
-                referrer_id,
-                f"✅ По вашей ссылке к нам пришёл(ла): @{join_request.from_user.username or 'человек без username'}"
+            # Уведомляем пригласившего (только в 1й раз)
+            asyncio.create_task(
+                check_and_notify_first_referral(bot, str(referrer_id), join_request.from_user.username)
             )
+
         else:
             # Приглашение не было создано через бота
             guest_data.update({
